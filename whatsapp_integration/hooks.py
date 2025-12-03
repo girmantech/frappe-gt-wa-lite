@@ -27,9 +27,9 @@ app_license = "mit"
 # include js, css files in header of desk.html
 # app_include_css = "/assets/whatsapp_integration/css/whatsapp_integration.css"
 # app_include_js = "/assets/whatsapp_integration/js/whatsapp_integration.js"
-app_include_js = [
-    "/assets/whatsapp_integration/js/whatsapp_button.js"
-]
+# app_include_js = [
+#     "/assets/whatsapp_integration/js/whatsapp_button.js"
+# ]
 
 
 # include js, css files in header of web template
@@ -48,6 +48,7 @@ app_include_js = [
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Sales Invoice": "public/js/sales_invoice.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
