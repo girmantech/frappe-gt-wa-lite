@@ -1,6 +1,10 @@
 import frappe
 import requests
 import base64
+import os
+import base64
+import requests
+import frappe
 from frappe import _
 from jinja2 import Template
 
@@ -268,6 +272,7 @@ def format_whatsapp_phone(phone):
 
 def send_text_message(phone, message):
     """Send text-only WhatsApp message"""
+    base_url = get_whatsapp_server_url()
     wa_payload = {
         "args": {
             "to": f"{phone}@c.us",
@@ -276,7 +281,7 @@ def send_text_message(phone, message):
     }
     
     try:
-        response = requests.post("http://localhost:8002/sendText", json=wa_payload, timeout=30)
+        response = requests.post(f"{base_url}/sendText", json=wa_payload, timeout=30)
         response.raise_for_status()
         return {"success": True, "response": response.json()}
     except requests.exceptions.RequestException as e:
@@ -346,9 +351,72 @@ def send_with_attachment(doc, phone, caption, doctype):
     }
     
     try:
-        wa_response = requests.post("http://localhost:8002/sendFile", json=wa_payload, timeout=60)
+        base_url = get_whatsapp_server_url()
+        wa_response = requests.post(f"{base_url}/sendFile", json=wa_payload, timeout=60)
         wa_response.raise_for_status()
         return {"success": True, "response": wa_response.json()}
     except requests.exceptions.RequestException as e:
         frappe.log_error(f"WhatsApp file send failed: {str(e)}", "WhatsApp Send File")
         frappe.throw(_("Failed to send via WhatsApp: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def render_whatsapp_message(doctype, docname):
+    """Render WhatsApp message from the selected template for a doctype and document.
+    Returns the rendered text and a flag indicating HTML usage.
+    """
+    doc = frappe.get_doc(doctype, docname)
+
+    templates = frappe.get_all('Whatsapp Template',
+        filters={
+            'reference_doctype': doctype,
+            'enabled': 1
+        },
+        limit=1
+    )
+
+    if not templates:
+        frappe.throw(_("No WhatsApp template found for {0}").format(doctype))
+
+    template_doc = frappe.get_doc('Whatsapp Template', templates[0].name)
+
+    try:
+        if template_doc.use_html:
+            jinja_template = Template(template_doc.response_html)
+        else:
+            jinja_template = Template(template_doc.response)
+
+        message = jinja_template.render(doc=doc)
+    except Exception as e:
+        frappe.log_error(f"Template rendering failed: {str(e)}", "WhatsApp Template Render")
+        frappe.throw(_("Failed to render message template: {0}").format(str(e)))
+
+    return {
+        'message': message,
+        'is_html': bool(template_doc.use_html),
+    }
+
+
+def get_whatsapp_server_url():
+    """Resolve WhatsApp server base URL as the current site URL.
+    Uses `frappe.utils.get_url()` so the WhatsApp server is the same host:port
+    as the running site (e.g., 127.0.0.1:8001, 127.0.0.1:8002, whatsapp.local:8000).
+
+    If you need to override, you can still set `frappe.conf.whatsapp_server_url`
+    or `WHATSAPP_SERVER_URL`, but by default we follow the site URL.
+    """
+    # Prefer explicit overrides if provided
+    try:
+        override = getattr(frappe.conf, 'whatsapp_server_url', None)
+    except Exception:
+        override = None
+    if override:
+        return override.rstrip('/')
+
+    env = os.environ.get('WHATSAPP_SERVER_URL')
+    if env:
+        return env.rstrip('/')
+
+    # Default: site base URL
+    site_url = frappe.utils.get_url().rstrip('/')
+    return site_url
