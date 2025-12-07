@@ -231,14 +231,25 @@ function show_whatsapp_dialog(frm, doctype) {
 }
 
 function send_whatsapp(frm, doctype, phone, contact_name) {
+    // Client-side sanity check to avoid needless server calls with bad numbers
+    const normalizedPhone = String(phone || '').replace(/[^\d]/g, '');
+    if (!normalizedPhone || normalizedPhone.length < 10 || normalizedPhone.length > 15) {
+        frappe.msgprint({
+            title: __('Invalid Phone Number'),
+            message: __('Please provide a valid phone number with country code (10-15 digits).'),
+            indicator: 'red'
+        });
+        return;
+    }
+
     frappe.call({
-        method: 'whatsapp_integration.api.api.render_whatsapp_message',
+        method: 'whatsapp_integration.api.api.prepare_whatsapp_presigned_message',
         args: {
             doctype: doctype,
             docname: frm.doc.name
         },
         freeze: true,
-        freeze_message: __('🧩 Preparing WhatsApp message...'),
+        freeze_message: __('🧩 Preparing WhatsApp message and link...'),
         callback: (r) => {
             let msg = r.message && r.message.message ? r.message.message : '';
             if (!msg) {
@@ -265,7 +276,6 @@ function send_whatsapp(frm, doctype, phone, contact_name) {
 
             // Build WhatsApp Web URL (wa.me)
             const encoded = encodeURIComponent(msg);
-            const normalizedPhone = String(phone).replace(/[^\d]/g, '');
             const url = `https://wa.me/${normalizedPhone}?text=${encoded}`;
 
             // Open in new tab

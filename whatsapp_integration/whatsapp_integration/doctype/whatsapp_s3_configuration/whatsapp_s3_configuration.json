@@ -1,0 +1,68 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-07 12:48:10.089500",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "aws_key",
+  "aws_secret",
+  "bucket",
+  "region_name",
+  "signature_version"
+ ],
+ "fields": [
+  {
+   "fieldname": "aws_key",
+   "fieldtype": "Data",
+   "label": "AWS Key"
+  },
+  {
+   "fieldname": "aws_secret",
+   "fieldtype": "Data",
+   "label": "AWS Secret"
+  },
+  {
+   "fieldname": "bucket",
+   "fieldtype": "Data",
+   "label": "S3 Bucket"
+  },
+  {
+   "default": "s3v4",
+   "fieldname": "signature_version",
+   "fieldtype": "Data",
+   "label": "Signature Version"
+  },
+  {
+   "description": "Example format: ap-southeast-2",
+   "fieldname": "region_name",
+   "fieldtype": "Data",
+   "label": "Region Name"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-12-07 14:06:49.769456",
+ "modified_by": "Administrator",
+ "module": "Whatsapp Integration",
+ "name": "Whatsapp S3 Configuration",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
