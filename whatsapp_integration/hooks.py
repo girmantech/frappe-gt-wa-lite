@@ -26,11 +26,9 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/whatsapp_integration/css/whatsapp_integration.css"
-# app_include_js = "/assets/whatsapp_integration/js/whatsapp_integration.js"
-# app_include_js = [
-#     "/assets/whatsapp_integration/js/whatsapp_button.js"
-# ]
-
+app_include_js = [
+    "/assets/whatsapp_integration/js/whatsapp_button.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/whatsapp_integration/css/whatsapp_integration.css"
@@ -48,10 +46,10 @@ app_license = "mit"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
-doctype_js = {"Sales Invoice": "public/js/sales_invoice.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
-# doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
-# doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
+# If you still need Sales Invoice–specific behavior, keep its JS here, otherwise you can remove it.
+# doctype_js = {
+#     "Sales Invoice": "public/js/sales_invoice.js",
+# }
 
 # Svg Icons
 # ------------------
