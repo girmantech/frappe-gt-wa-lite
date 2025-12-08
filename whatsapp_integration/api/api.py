@@ -518,13 +518,13 @@ def prepare_whatsapp_presigned_message(doctype, docname):
     pdf_bytes = generate_pdf_bytes(doc, doctype)
 
     try:
-        s3_url = upload_pdf_and_get_presigned_url(doc, doctype, pdf_bytes, expiry_seconds=12 * 60 * 60)
+        s3_url = upload_pdf_and_get_presigned_url(doc, doctype, pdf_bytes, expiry_seconds=7 * 24 * 60 * 60)
     except Exception as e:
         err = str(e)
         frappe.log_error(message=err, title="WhatsApp S3 Upload")
         frappe.throw(_("Failed to upload to S3 or create presigned URL: {0}").format(err))
 
-    link_notice = _("This link will expire in 12 hours.")
+    link_notice = _("This link will expire in 7 days.")
     message_with_link = f"{caption}\n\n{_('Download PDF')}: {s3_url}\n{link_notice}"
 
     return {
