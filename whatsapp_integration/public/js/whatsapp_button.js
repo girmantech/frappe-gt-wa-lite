@@ -1,179 +1,148 @@
-// Universal WhatsApp Button - Automatically adds button to any form with a template
+console.log("WhatsApp button script loaded");
 
-console.log("WhatsApp button script loaded (desk)");
-// Cache template counts per doctype to avoid repeated server calls
-window.__waTemplateCountCache = window.__waTemplateCountCache || {};
+// Cache to avoid repeated server calls
+const templateCountCache = {};
 
+// Method 1: Standard form hook
 frappe.ui.form.on('*', {
     refresh(frm) {
-        try {
-            // Basic guards
-            if (!frm || !frm.doc) return;
-            console.log("WhatsApp refresh for", frm.doctype, frm.doc.name, "islocal:", frm.doc.__islocal);
+        handle_whatsapp_button(frm);
+    },
 
-            if (frm.doc.__islocal) {
-                return;
-            }
-
-            frappe.call({
-                method: 'frappe.client.get_count',
-                args: {
-                    doctype: 'Whatsapp Template',
-                    filters: {
-                        reference_doctype: frm.doctype,
-                        enabled: 1
-                    }
-                },
-                callback: (r) => {
-                    const count = (r && typeof r.message === 'number') ? r.message : 0;
-                    console.log("Template count for", frm.doctype, "=", count);
-                    if (count > 0 && !frm.__whatsapp_button_added) {
-                        add_whatsapp_button(frm);
-                    }
-                }
-            });
-        } catch (e) {
-            // Fail-safe: never break the form UI
-            console.warn("WhatsApp button refresh error:", e);
-        }
+    after_save(frm) {
+        handle_whatsapp_button(frm);
     }
 });
 
-// Fallback: also hook via route changes in case '*' handler doesn't fire in some contexts
-if (frappe.router && typeof frappe.router.on === 'function') {
-    frappe.router.on('change', () => {
-        try {
-            const route = frappe.get_route();
-            // Expecting ["Form", doctype, name]
-            if (!route || route[0] !== 'Form') return;
+// Method 2: Override the Form class's refresh method
+(function() {
+    if (!frappe.ui.form.Form) {
+        return;
+    }
 
-            const doctype = route[1];
-            const name = route[2];
+    const original_refresh = frappe.ui.form.Form.prototype.refresh;
+    
+    frappe.ui.form.Form.prototype.refresh = function() {
+        // Call original refresh first
+        const result = original_refresh.apply(this, arguments);
+        
+        
+        // Add our button logic
+        if (this.doc && !this.doc.__islocal) {
+            handle_whatsapp_button(this);
+        }
+        
+        return result;
+    };
+    
+})();
 
-            const frm = cur_frm; // current form
-            if (!frm || frm.doctype !== doctype || frm.docname !== name) return;
-            if (!frm.doc || frm.doc.__islocal) return;
+// Method 3: Listen to page change events
+$(document).on('page-change', function() {
+    setTimeout(() => {
+        if (cur_frm && cur_frm.doc && !cur_frm.doc.__islocal) {
+            handle_whatsapp_button(cur_frm);
+        }
+    }, 300);
+});
 
-            // Bind once per form instance
-            if (!frm.__whatsapp_route_bound) {
-                frm.__whatsapp_route_bound = true;
-                const handler = () => {
-                    frappe.call({
-                        method: 'frappe.client.get_count',
-                        args: {
-                            doctype: 'Whatsapp Template',
-                            filters: {
-                                reference_doctype: frm.doctype,
-                                enabled: 1
-                            }
-                        },
-                        callback: (r) => {
-                            const count = (r && typeof r.message === 'number') ? r.message : 0;
-                            console.log('[route] Template count for', frm.doctype, '=', count);
-                            if (count > 0 && !frm.__whatsapp_button_added) {
-                                add_whatsapp_button(frm);
-                            }
-                        }
-                    });
-                };
-
-                // Run now and on every refresh
-                handler();
-                // In some builds frm.on may not exist; rely on handler + polling below
+// Method 4: Watch for cur_frm changes
+(function() {
+    let lastFormId = null;
+    
+    setInterval(() => {
+        if (cur_frm && cur_frm.doc) {
+            const currentFormId = `${cur_frm.doctype}-${cur_frm.doc.name}`;
+            
+            if (currentFormId !== lastFormId) {
+                lastFormId = currentFormId;
+                
+                if (!cur_frm.doc.__islocal) {
+                    handle_whatsapp_button(cur_frm);
+                }
             }
-        } catch (e) {
-            console.warn('WhatsApp route hook error:', e);
+        }
+    }, 1000);
+    
+    console.log("cur_frm watcher installed");
+})();
+
+function handle_whatsapp_button(frm) {
+    // Skip if no form or document
+    if (!frm || !frm.doc) {
+        return;
+    }
+    
+    // Skip for new/unsaved documents
+    if (frm.doc.__islocal) {
+        return;
+    }
+
+
+    // Check if button already exists (avoid duplicates)
+    if (frm.__whatsapp_button_added) {
+        return;
+    }
+
+    const doctype = frm.doctype;
+
+    // Check cache first
+    if (templateCountCache.hasOwnProperty(doctype)) {
+        const count = templateCountCache[doctype];
+        if (count > 0) {
+            add_whatsapp_button(frm);
+        } else {
+            console.log("No templates available for", doctype);
+        }
+        return;
+    }
+
+    // Fetch template count
+    console.log("Fetching template count for", doctype);
+    frappe.call({
+        method: 'frappe.client.get_count',
+        args: {
+            doctype: 'Whatsapp Template',
+            filters: {
+                reference_doctype: doctype,
+                enabled: 1
+            }
+        },
+        callback: (r) => {
+            const count = (r && typeof r.message === 'number') ? r.message : 0;
+            
+            // Cache the result
+            templateCountCache[doctype] = count;
+            
+            if (count > 0) {
+                add_whatsapp_button(frm);
+            } else {
+                console.log("No templates available for", doctype);
+            }
+        },
+        error: (r) => {
+            console.error("Error fetching template count:", r);
         }
     });
 }
 
-// Last-resort fallback: poll for cur_frm and bind once per form
-(function bind_whatsapp_button_with_polling() {
-    // Use a single interval and clear it as soon as we know the outcome
-    if (window.__waPollHandle) return; // prevent multiple pollers
-
-    let attempts = 0;
-    const maxAttempts = 40; // up to ~20s at 500ms
-
-    window.__waPollHandle = setInterval(() => {
-        attempts += 1;
-        try {
-            const route = (typeof frappe.get_route === 'function') ? frappe.get_route() : null;
-            if (!route || route[0] !== 'Form') {
-                // Not on a Form route; stop polling
-                clearInterval(window.__waPollHandle);
-                window.__waPollHandle = null;
-                return;
-            }
-
-            const frm = (typeof cur_frm !== 'undefined') ? cur_frm : null;
-            if (!frm || !frm.doc) return; // wait for form to be ready
-
-            if (frm.__whatsapp_button_added) {
-                clearInterval(window.__waPollHandle);
-                window.__waPollHandle = null;
-                return;
-            }
-
-            if (frm.doc.__islocal) return; // wait until saved
-
-            const doctype = frm.doctype;
-            const cached = window.__waTemplateCountCache[doctype];
-            const handleCount = (count) => {
-                window.__waTemplateCountCache[doctype] = count;
-                console.log('[poll] Template count for', doctype, '=', count);
-                if (count > 0 && !frm.__whatsapp_button_added) {
-                    add_whatsapp_button(frm);
-                    frm.__whatsapp_button_added = true;
-                }
-                // Either way, we learned the outcome for this doctype; stop polling
-                clearInterval(window.__waPollHandle);
-                window.__waPollHandle = null;
-            };
-
-            if (typeof cached === 'number') {
-                handleCount(cached);
-                return;
-            }
-
-            // Fetch once, then cache
-            frappe.call({
-                method: 'frappe.client.get_count',
-                args: {
-                    doctype: 'Whatsapp Template',
-                    filters: {
-                        reference_doctype: doctype,
-                        enabled: 1
-                    }
-                },
-                callback: (r) => {
-                    const count = (r && typeof r.message === 'number') ? r.message : 0;
-                    handleCount(count);
-                }
-            });
-        } catch (e) {
-            console.warn('WhatsApp polling bind error:', e);
-        } finally {
-            if (attempts >= maxAttempts && window.__waPollHandle) {
-                clearInterval(window.__waPollHandle);
-                window.__waPollHandle = null;
-            }
-        }
-    }, 500);
-})();
-
 function add_whatsapp_button(frm) {
     try {
-        console.log("Adding WhatsApp button on", frm.doctype);
-        // Add as a top-level custom button to ensure visibility
-        const btn = frm.add_custom_button('📱 Send via WhatsApp', () => {
+        // Double-check we haven't already added it
+        if (frm.__whatsapp_button_added) {
+            return;
+        }
+        
+        // Add as a top-level custom button
+        frm.add_custom_button('📱 Send via WhatsApp', () => {
             show_whatsapp_dialog(frm, frm.doctype);
         });
-        // Mark as added only when call didn't throw
+        
+        // Mark as added
         frm.__whatsapp_button_added = true;
-        return btn;
+        
     } catch (e) {
-        console.warn('Failed to add WhatsApp button:', e);
+        console.error('❌ Failed to add WhatsApp button:', e);
     }
 }
 
@@ -231,7 +200,6 @@ function show_whatsapp_dialog(frm, doctype) {
 }
 
 function send_whatsapp(frm, doctype, phone, contact_name) {
-    // Client-side sanity check to avoid needless server calls with bad numbers
     const normalizedPhone = String(phone || '').replace(/[^\d]/g, '');
     if (!normalizedPhone || normalizedPhone.length < 10 || normalizedPhone.length > 15) {
         frappe.msgprint({
@@ -261,24 +229,19 @@ function send_whatsapp(frm, doctype, phone, contact_name) {
                 return;
             }
 
-            // If template is HTML or Text Editor produced HTML, strip tags to plain text
+            // If template is HTML, strip tags to plain text
             const isHtml = r.message && r.message.is_html;
             if (isHtml || /<\/?[a-z][\s\S]*>/i.test(msg)) {
                 const tmp = document.createElement('div');
                 tmp.innerHTML = msg;
-                // Replace <br> with newlines before text extraction
                 tmp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
-                // Get readable text content
                 msg = tmp.textContent || tmp.innerText || '';
-                // Collapse excessive whitespace
                 msg = msg.replace(/[\t\x0B\f\r ]+/g, ' ').replace(/\n\s+/g, '\n').trim();
             }
 
-            // Build WhatsApp Web URL (wa.me)
             const encoded = encodeURIComponent(msg);
             const url = `https://wa.me/${normalizedPhone}?text=${encoded}`;
 
-            // Open in new tab
             window.open(url, '_blank');
 
             frappe.show_alert({
